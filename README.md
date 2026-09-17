@@ -22,6 +22,49 @@ Packages get automatically built by GitHub Actions and get uploaded to
 [evdi]: https://github.com/DisplayLink/evdi
 [releases]: https://github.com/displaylink-rpm/displaylink-rpm/releases
 
+## RPM repositories
+
+In addition to the release assets, the CI also publishes an RPM repository for
+each supported distribution to GitHub Pages. This lets `dnf` keep the package
+up to date automatically instead of downloading a new RPM by hand.
+
+The repositories are served from `https://displaylink-rpm.github.io/displaylink-rpm/`.
+Add the repository that matches your distribution with, for example:
+
+```bash
+sudo dnf config-manager --add-repo \
+  https://displaylink-rpm.github.io/displaylink-rpm/fedora-43.repo
+```
+
+The following distributions are published:
+
+- Fedora 43 and 44
+- CentOS Stream 9 and 10
+- Rocky Linux 9 and 10
+- AlmaLinux 9 and 10
+
+The packages and repository metadata are GPG-signed, so `gpgcheck` and
+`repo_gpgcheck` are enabled in the generated `.repo` files. Import the public
+key (also published alongside the repositories) before installing:
+
+```bash
+sudo rpm --import https://displaylink-rpm.github.io/displaylink-rpm/RPM-GPG-KEY-displaylink
+```
+
+### Signing configuration
+
+Signing requires the following repository secrets:
+
+- `GPG_PRIVATE_KEY` — ASCII-armored private key used to sign RPMs and metadata.
+- `GPG_PASSPHRASE` — passphrase for the key (may be empty if unprotected).
+- `GPG_KEY_ID` — (optional) key id or email; auto-detected from the key if unset.
+
+If `GPG_PRIVATE_KEY` is not set the workflow still runs, but the repositories
+are published unsigned with `gpgcheck=0`.
+
+> NOTE: GitHub Pages must be enabled on the repository with the source set to
+> "GitHub Actions" for the deployment to succeed.
+
 ## Usage
 
 > NOTE: Now buildable cleanly via .spec file (in mock f.e.). Download files

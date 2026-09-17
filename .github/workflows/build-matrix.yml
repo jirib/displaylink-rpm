@@ -16,6 +16,10 @@ on:
         required: false
         type: boolean
         default: false
+      upload-release:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -82,7 +86,7 @@ jobs:
           path: ${{ matrix.os }}-${{ matrix.version }}-displaylink-${{ env.VERSION }}-${{ env.RELEASE }}.*.rpm
 
       - name: Upload to release
-        if: inputs.upload
+        if: inputs.upload-release
         uses: xresloader/upload-to-github-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

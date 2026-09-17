@@ -1,6 +1,7 @@
 name: Create Release Assets
 
 on:
+  workflow_dispatch:
   release:
     types:
       - published
@@ -44,6 +45,7 @@ jobs:
       arch: x86_64
       specifictarget: rpm-github
       upload: true
+      upload-release: ${{ github.event_name == 'release' }}
     secrets: inherit
 
   buildrpms-arm:
@@ -53,4 +55,42 @@ jobs:
       arch: aarch64
       specifictarget: rpm-github
       upload: true
+      upload-release: ${{ github.event_name == 'release' }}
     secrets: inherit
+
+  create-repositories:
+    name: Publish RPM repositories
+    needs: [buildrpms-x86-64, buildrpms-arm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download built RPMs
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Install repository and signing tools
+        run: sudo apt-get update && sudo apt-get install -y createrepo-c gnupg rpm
+
+      - name: Build RPM repositories and sign
+        run: bash ci/create-repos.sh artifacts public "${{ github.repository }}"
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
