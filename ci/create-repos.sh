@@ -202,7 +202,7 @@ fi
   echo '<h1>displaylink-rpm repositories</h1>'
   echo '<p>Add a repository to your system by pointing dnf at a <code>baseurl</code>'
   echo 'below, or by adding one of the generated <code>.repo</code> files, e.g.:</p>'
-  echo '<pre>dnf config-manager --add-repo '"${BASE_URL}"'fedora-43.repo</pre>'
+  echo '<pre>sudo curl -o /etc/yum.repos.d/displaylink.repo '"${BASE_URL}"'fedora-43.repo</pre>'
   if [ "${SIGNING}" -eq 1 ]; then
     echo '<p>Import the signing key first:</p>'
     echo '<pre>sudo rpm --import '"${BASE_URL}"'RPM-GPG-KEY-displaylink</pre>'

@@ -32,7 +32,7 @@ The repositories are served from `https://displaylink-rpm.github.io/displaylink-
 Add the repository that matches your distribution with, for example:
 
 ```bash
-sudo dnf config-manager --add-repo \
+sudo curl -o /etc/yum.repos.d/displaylink.repo \
   https://displaylink-rpm.github.io/displaylink-rpm/fedora-43.repo
 ```
 
@@ -46,7 +46,7 @@ The following distributions are published:
 A source repository is published too, so you can fetch the SRPM:
 
 ```bash
-sudo dnf config-manager --add-repo \
+sudo curl -o /etc/yum.repos.d/displaylink-src.repo \
   https://displaylink-rpm.github.io/displaylink-rpm/src.repo
 dnf --enablerepo=displaylink-src download --source displaylink
 ```
