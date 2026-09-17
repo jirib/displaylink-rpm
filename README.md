@@ -43,6 +43,14 @@ The following distributions are published:
 - Rocky Linux 9 and 10
 - AlmaLinux 9 and 10
 
+A source repository is published too, so you can fetch the SRPM:
+
+```bash
+sudo dnf config-manager --add-repo \
+  https://displaylink-rpm.github.io/displaylink-rpm/src.repo
+dnf --enablerepo=displaylink-src download --source displaylink
+```
+
 The packages and repository metadata are GPG-signed, so `gpgcheck` and
 `repo_gpgcheck` are enabled in the generated `.repo` files. Import the public
 key (also published alongside the repositories) before installing:

@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# Organize built RPMs into per-distribution RPM repositories, generate
-# repository metadata with createrepo_c and, optionally, GPG-sign the RPMs and
-# the repository metadata.
+# Organize built RPMs into per-distribution binary repositories plus a single
+# source (SRPM) repository, generate repository metadata with createrepo_c and,
+# optionally, GPG-sign the RPMs and the repository metadata.
 #
 # Usage:
 #   create-repos.sh <artifacts-dir> <output-dir> <repository> [base-url]
@@ -16,6 +16,9 @@ set -euo pipefail
 #                  default base URL for the generated .repo files.
 #   base-url       Optional base URL override. Defaults to the GitHub Pages URL
 #                  derived from <repository>.
+#
+# Source RPMs (files matching *.src.rpm) are collected into a single
+# <output-dir>/repos/src repository; all other RPMs are grouped per-distro.
 #
 # Signing is enabled when the following environment variables are present:
 #
@@ -51,6 +54,7 @@ if [ -n "${GPG_PRIVATE_KEY:-}" ]; then
 fi
 
 REPOS_ROOT="${OUTPUT_DIR}/repos"
+SRC_DIR="src"
 mkdir -p "${REPOS_ROOT}"
 
 distro_name() {
@@ -77,18 +81,29 @@ distro_version() {
   esac
 }
 
-# Collect all RPMs and place them in their per-distro repo directory.
+# Collect RPMs: SRPMs go into a single source repo, everything else is grouped
+# by distribution/version.
 declare -A REPOS
+HAVE_SRPM=0
 while IFS= read -r -d '' rpm; do
-  os="$(distro_name "$rpm")" || { echo "WARNING: cannot classify ${rpm}, skipping" >&2; continue; }
-  version="$(distro_version "$rpm")"
-  dir="${os}/${version}"
-  mkdir -p "${REPOS_ROOT}/${dir}"
-  cp -n "$rpm" "${REPOS_ROOT}/${dir}/"
-  REPOS["${dir}"]=1
+  case "${rpm}" in
+    *.src.rpm)
+      mkdir -p "${REPOS_ROOT}/${SRC_DIR}"
+      cp -n "$rpm" "${REPOS_ROOT}/${SRC_DIR}/"
+      HAVE_SRPM=1
+      ;;
+    *)
+      os="$(distro_name "$rpm")" || { echo "WARNING: cannot classify ${rpm}, skipping" >&2; continue; }
+      version="$(distro_version "$rpm")"
+      dir="${os}/${version}"
+      mkdir -p "${REPOS_ROOT}/${dir}"
+      cp -n "$rpm" "${REPOS_ROOT}/${dir}/"
+      REPOS["${dir}"]=1
+      ;;
+  esac
 done < <(find "${ARTIFACTS_DIR}" -type f -name '*.rpm' -print0)
 
-if [ "${#REPOS[@]}" -eq 0 ]; then
+if [ "${#REPOS[@]}" -eq 0 ] && [ "${HAVE_SRPM}" -eq 0 ]; then
   echo "ERROR: no RPMs found under ${ARTIFACTS_DIR}" >&2
   exit 1
 fi
@@ -122,8 +137,9 @@ EOF
   done < <(find "${REPOS_ROOT}" -type f -name '*.rpm' -print0)
 fi
 
-# Generate repository metadata and sign repomd.xml.
-for dir in $(printf '%s\n' "${!REPOS[@]}" | sort); do
+# Generate repository metadata and sign repomd.xml for a single repo directory.
+write_repo_metadata() {
+  local dir="$1"
   echo "Creating repository metadata for ${dir} ..."
   (cd "${REPOS_ROOT}/${dir}" && createrepo_c --update .)
 
@@ -134,7 +150,14 @@ for dir in $(printf '%s\n' "${!REPOS[@]}" | sort); do
         --output repodata/repomd.xml.asc repodata/repomd.xml \
         <<< "${GPG_PASSPHRASE:-}")
   fi
+}
+
+for dir in $(printf '%s\n' "${!REPOS[@]}" | sort); do
+  write_repo_metadata "${dir}"
 done
+if [ "${HAVE_SRPM}" -eq 1 ]; then
+  write_repo_metadata "${SRC_DIR}"
+fi
 
 # Export the public key so users can import it into RPM.
 if [ "${SIGNING}" -eq 1 ]; then
@@ -142,17 +165,15 @@ if [ "${SIGNING}" -eq 1 ]; then
   echo "Exported ${OUTPUT_DIR}/RPM-GPG-KEY-displaylink"
 fi
 
-# Generate a dnf/yum .repo file per distro/version.
-for dir in $(printf '%s\n' "${!REPOS[@]}" | sort); do
-  os="${dir%%/*}"
-  version="${dir#*/}"
-  repoid="displaylink-${os}-${version}"
-  repo_file="${OUTPUT_DIR}/${os}-${version}.repo"
+# Write a dnf/yum .repo file.
+write_repo_file() {
+  local dir="$1" repoid="$2" name="$3" enabled="$4" filebase="$5"
+  local repo_file="${OUTPUT_DIR}/${filebase}.repo"
   {
     echo "[${repoid}]"
-    echo "name=DisplayLink driver for ${os} ${version}"
+    echo "name=${name}"
     echo "baseurl=${BASE_URL}repos/${dir}/"
-    echo "enabled=1"
+    echo "enabled=${enabled}"
     if [ "${SIGNING}" -eq 1 ]; then
       echo "gpgcheck=1"
       echo "repo_gpgcheck=1"
@@ -163,7 +184,16 @@ for dir in $(printf '%s\n' "${!REPOS[@]}" | sort); do
     echo
   } > "${repo_file}"
   echo "Wrote ${repo_file}"
+}
+
+for dir in $(printf '%s\n' "${!REPOS[@]}" | sort); do
+  os="${dir%%/*}"
+  version="${dir#*/}"
+  write_repo_file "${dir}" "displaylink-${os}-${version}" "DisplayLink driver for ${os} ${version}" "1" "${os}-${version}"
 done
+if [ "${HAVE_SRPM}" -eq 1 ]; then
+  write_repo_file "${SRC_DIR}" "displaylink-src" "DisplayLink driver (source RPMs)" "0" "src"
+fi
 
 # Simple index page linking to every repository and .repo file.
 {
@@ -181,6 +211,9 @@ done
   for dir in $(printf '%s\n' "${!REPOS[@]}" | sort); do
     echo "<li><a href=\"repos/${dir}/\">${dir}</a></li>"
   done
+  if [ "${HAVE_SRPM}" -eq 1 ]; then
+    echo "<li><a href=\"repos/${SRC_DIR}/\">${SRC_DIR} (source RPMs)</a></li>"
+  fi
   echo '</ul>'
   echo '</body></html>'
 } > "${OUTPUT_DIR}/index.html"

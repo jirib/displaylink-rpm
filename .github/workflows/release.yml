@@ -27,7 +27,15 @@ jobs:
       - name: Build SRPM
         run: ci/rocky.sh
 
+      - name: Upload SRPM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: srpm
+          path: 'displaylink-${{ env.VERSION }}-${{ env.RELEASE }}*.src.rpm'
+          if-no-files-found: error
+
       - name: Upload SRPM to release
+        if: github.event_name == 'release'
         uses: xresloader/upload-to-github-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -60,7 +68,7 @@ jobs:
 
   create-repositories:
     name: Publish RPM repositories
-    needs: [buildrpms-x86-64, buildrpms-arm]
+    needs: [build-srpm, buildrpms-x86-64, buildrpms-arm]
     runs-on: ubuntu-latest
     permissions:
       contents: read
