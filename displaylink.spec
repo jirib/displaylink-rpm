@@ -253,7 +253,6 @@ fi
 %{_prefix}/src/evdi-%{version}-%{release}/tests/evdi_fake_user_client.h
 %{_prefix}/src/evdi-%{version}-%{release}/tests/evdi_test.c
 %{_prefix}/src/evdi-%{version}-%{release}/tests/evdi_test.h
-%{_prefix}/src/evdi-%{version}-%{release}/tests/test_evdi_hotplug.c
 %{_prefix}/src/evdi-%{version}-%{release}/tests/test_evdi_vt_switch.c
 
 %dir %{_libexecdir}/%{name}
